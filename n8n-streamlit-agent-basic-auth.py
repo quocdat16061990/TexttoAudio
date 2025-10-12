@@ -411,7 +411,6 @@ def main():
                 margin: 10px 0 10px auto;
                 font-size: 15px;
                 line-height: 1.6;
-                box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
                 font-weight: 500;
             }
             
