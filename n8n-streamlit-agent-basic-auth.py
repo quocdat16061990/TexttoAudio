@@ -8,7 +8,7 @@ import shutil
 from openai import OpenAI
 
 # ========= CONFIG =========
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+OPENAI_API_KEY = ""
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========= UTILS =========
@@ -30,6 +30,8 @@ def gencomponent(name, template="", script=""):
                             background-color: transparent;
                             margin: 0;
                             padding: 0;
+                            display: flex;
+                            justify-content: flex-end;
                         }}
                         #toggleBtn {{
                             padding: 12px 24px;
@@ -356,42 +358,71 @@ def main():
     st.set_page_config(page_title="Trợ Lý AI", page_icon="🤖", layout="centered")
 
     # UI Style
+    # Thay thế phần st.markdown CSS trong code của bạn bằng đoạn này:
+    
     st.markdown("""
         <style>
-        
+            /* Import font đẹp từ Google Fonts */
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+            
+            * {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+            
+            /* Logo container - căn giữa phía trên */
+            .stImage {
+                display: flex;
+                justify-content: center;
+                margin: 20px auto 10px auto !important;
+                max-width: 120px;
+            }
+            
+            /* Title */
+            h1 {
+                font-weight: 700;
+                font-size: 22px !important;
+                text-align: center;
+                margin: 10px 0 20px 0 !important;
+                letter-spacing: -0.5px;
+            }
             
             /* Messages */
             .assistant {
                 background: rgba(255, 255, 255, 0.95);
                 backdrop-filter: blur(10px);
-                padding: 16px 22px;
-                border-radius: 20px;
-                max-width: 75%;
+                padding: 14px 18px;
+                border-radius: 18px;
+                max-width: 80%;
                 text-align: left;
-                margin: 12px 0;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+                margin: 10px 0;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
                 color: #1a202c;
                 font-size: 15px;
                 line-height: 1.6;
-                border-left: 5px solid #667eea;
+                border-left: 4px solid #667eea;
+                font-weight: 400;
             }
             
             .user {
-                padding: 16px 22px;
-                border-radius: 20px;
-                max-width: 75%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 14px 18px;
+                border-radius: 18px;
+                max-width: 80%;
                 text-align: right;
-                margin: 12px 0 12px auto;
+                margin: 10px 0 10px auto;
                 font-size: 15px;
                 line-height: 1.6;
+                box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
+                font-weight: 500;
             }
             
-            /* Voice mode section */
+            /* Voice mode section - căn phải */
             .voice-mode {
-                margin-top: 20px;
-                margin-bottom: 10px;
+                margin: 20px 0 15px 0;
                 display: flex;
                 justify-content: flex-end;
+                padding-right: 10px;
             }
             
             /* Reset button */
@@ -400,60 +431,91 @@ def main():
                 color: white !important;
                 border: none !important;
                 border-radius: 10px;
-                padding: 10px 20px;
+                padding: 10px 18px;
                 font-weight: 600;
-                box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+                font-size: 14px;
+                box-shadow: 0 3px 12px rgba(245, 87, 108, 0.3);
                 transition: all 0.3s ease;
             }
             
             .stButton > button:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(245, 87, 108, 0.5);
+                box-shadow: 0 5px 16px rgba(245, 87, 108, 0.4);
             }
             
-            /* Title */
-            h1 {
-                
-                font-weight: 700;
+            /* Chat input */
+            .stChatInput {
+                font-size: 15px !important;
+            }
+            
+            .stChatInput textarea {
+                font-size: 15px !important;
+                font-weight: 400 !important;
+                padding: 12px !important;
             }
             
             /* Audio player */
             audio {
                 width: 100%;
-                margin-top: 10px;
+                margin-top: 8px;
                 border-radius: 10px;
+                outline: none;
             }
             
-            /* Spinner */
-            .stSpinner > div {
-                border-top-color: white !important;
-            }
-            
-            /* Success message */
+            /* Success/Error messages */
             .stSuccess {
                 background: rgba(255, 255, 255, 0.95);
                 backdrop-filter: blur(10px);
                 border-radius: 10px;
                 border-left: 4px solid #48bb78;
+                font-size: 14px;
+                font-weight: 500;
             }
             
-            /* Error message */
             .stError {
                 background: rgba(255, 255, 255, 0.95);
                 backdrop-filter: blur(10px);
                 border-radius: 10px;
                 border-left: 4px solid #f56565;
+                font-size: 14px;
+                font-weight: 500;
             }
             
-            @media (max-width: 520px) {
+            /* Mobile optimization */
+            @media (max-width: 768px) {
+                h1 {
+                    font-size: 17px !important;
+                }
+                
                 .assistant, .user {
                     max-width: 85%;
                     font-size: 14px;
+                    padding: 12px 16px;
+                }
+                
+                .stButton > button {
+                    font-size: 13px;
+                    padding: 8px 16px;
+                }
+                
+                .voice-mode {
+                    padding-right: 5px;
+                }
+               
+            }
+            
+            @media (max-width: 480px) {
+                h1 {
+                    font-size: 17px !important;
+                }
+                
+                .assistant, .user {
+                    font-size: 13px;
+                    padding: 10px 14px;
                 }
             }
         </style>
     """, unsafe_allow_html=True)
-
     # Logo
     try:
         col1, col2, col3 = st.columns([3, 2, 3])
