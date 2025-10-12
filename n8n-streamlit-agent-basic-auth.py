@@ -377,14 +377,11 @@ def main():
             }
             
             .user {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
                 padding: 16px 22px;
                 border-radius: 20px;
                 max-width: 75%;
                 text-align: right;
                 margin: 12px 0 12px auto;
-                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
                 font-size: 15px;
                 line-height: 1.6;
             }
@@ -416,8 +413,7 @@ def main():
             
             /* Title */
             h1 {
-                color: white !important;
-                text-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+                
                 font-weight: 700;
             }
             
