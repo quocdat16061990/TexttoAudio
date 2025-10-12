@@ -12,7 +12,8 @@ from openai import OpenAI
 
 # ========= CONFIG =========
 
-
+BEARER_TOKEN = st.secrets.get("BEARER_TOKEN")
+WEBHOOK_URL = st.secrets.get("WEBHOOK_URL")
 ASSEMBLYAI_API_KEY = st.secrets.get("ASSEMBLYAI_API_KEY")
 FPT_API_KEY = st.secrets.get("FPT_API_KEY")
 FPT_TTS_URL = st.secrets.get("FPT_TTS_URL")
@@ -277,9 +278,10 @@ def generate_fpt_audio(text, voice):
 
 
 def send_message_to_llm(session_id, message):
+    headers = {"Authorization": f"Bearer {BEARER_TOKEN}", "Content-Type": "application/json"}
     payload = {"sessionId": session_id, "chatInput": message}
     try:
-        response = requests.post( json=payload)
+        response = requests.post(WEBHOOK_URL, json=payload, headers=headers)
         response.raise_for_status()
         response_data = response.json()
         contract = response_data.get('output', "No contract received")
