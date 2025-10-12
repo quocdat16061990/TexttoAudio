@@ -284,6 +284,7 @@ def send_message_to_llm(session_id, message):
         response = requests.post(WEBHOOK_URL, json=payload, headers=headers)
         response.raise_for_status()
         response_data = response.json()
+
         contract = response_data.get('output', "No contract received")
         url = response_data.get('url', "No URL received")
         north_audio = generate_fpt_audio(contract, "lannhi")
