@@ -12,15 +12,28 @@
                             padding: 0;
                         }
                         #toggleBtn {
-                            padding: 10px 20px;
-                            border-radius: 4px;
+                            padding: 12px 24px;
+                            border-radius: 8px;
                             border: none;
                             cursor: pointer;
-                            color: #282828;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
                             font-size: 16px;
+                            font-weight: 600;
+                            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                            transition: all 0.3s ease;
+                        }
+                        #toggleBtn:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
                         }
                         #toggleBtn.recording {
-                            background-color: red;
+                            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                            animation: pulse 1.5s infinite;
+                        }
+                        @keyframes pulse {
+                            0%, 100% { box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4); }
+                            50% { box-shadow: 0 4px 25px rgba(245, 87, 108, 0.8); }
                         }
                     </style>
                     <script>
@@ -155,7 +168,7 @@
                 mediaRecorder.start();
                 isRecording = true;
                 toggleBtn.classList.add('recording');
-                toggleBtn.innerHTML = '<i class="fa-solid fa-stop fa-lg" ></i> Dừng';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-stop fa-lg" ></i> Dừng ghi âm';
                 
             } catch (err) {
                 console.error('Error accessing microphone:', err);

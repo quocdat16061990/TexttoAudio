@@ -1,38 +1,19 @@
-
 import time
 import streamlit as st
 import os
 import uuid
-import requests
-import assemblyai as aai
 import base64
 import streamlit.components.v1 as components
 import shutil
 from openai import OpenAI
 
 # ========= CONFIG =========
-
-BEARER_TOKEN = st.secrets.get("BEARER_TOKEN")
-WEBHOOK_URL = st.secrets.get("WEBHOOK_URL")
-ASSEMBLYAI_API_KEY = st.secrets.get("ASSEMBLYAI_API_KEY")
-FPT_API_KEY = st.secrets.get("FPT_API_KEY")
-FPT_TTS_URL = st.secrets.get("FPT_TTS_URL")
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 # ========= UTILS =========
 def generate_session_id():
     return str(uuid.uuid4())
-
-
-def rfile(name_file):
-    try:
-        with open(name_file, "r", encoding="utf-8") as file:
-            return file.read()
-    except FileNotFoundError:
-        st.error(f"File {name_file} không tồn tại.")
-
 
 # ======== AUDIO RECORDER COMPONENT ========
 def gencomponent(name, template="", script=""):
@@ -51,15 +32,28 @@ def gencomponent(name, template="", script=""):
                             padding: 0;
                         }}
                         #toggleBtn {{
-                            padding: 10px 20px;
-                            border-radius: 4px;
+                            padding: 12px 24px;
+                            border-radius: 8px;
                             border: none;
                             cursor: pointer;
-                            color: #282828;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
                             font-size: 16px;
+                            font-weight: 600;
+                            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                            transition: all 0.3s ease;
+                        }}
+                        #toggleBtn:hover {{
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
                         }}
                         #toggleBtn.recording {{
-                            background-color: red;
+                            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                            animation: pulse 1.5s infinite;
+                        }}
+                        @keyframes pulse {{
+                            0%, 100% {{ box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4); }}
+                            50% {{ box-shadow: 0 4px 25px rgba(245, 87, 108, 0.8); }}
                         }}
                     </style>
                     <script>
@@ -115,7 +109,6 @@ def gencomponent(name, template="", script=""):
         component_value = func(**params)
         return component_value
     return f
-
 
 template = """<button id="toggleBtn"><i class="fa-solid fa-microphone fa-lg" ></i> Bấm để nói</button>"""
 
@@ -213,7 +206,7 @@ script = """
                 mediaRecorder.start();
                 isRecording = true;
                 toggleBtn.classList.add('recording');
-                toggleBtn.innerHTML = '<i class="fa-solid fa-stop fa-lg" ></i> Dừng';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-stop fa-lg" ></i> Dừng ghi âm';
                 
             } catch (err) {
                 console.error('Error accessing microphone:', err);
@@ -254,122 +247,98 @@ def audio_recorder(interval=50, threshold=-60, play=False, silenceTimeout=1500, 
     component_func = gencomponent('configurable_audio_recorder', template=template, script=script)
     return component_func(interval=interval, threshold=threshold, play=play, silenceTimeout=silenceTimeout, key=key)
 
-
-# ========= AUDIO FUNCTIONS =========
-def generate_fpt_audio(text, voice):
-    headers = {"api-key": FPT_API_KEY, "voice": voice, "format": "mp3"}
+# ========= OPENAI FUNCTIONS =========
+def generate_openai_audio(text):
+    """Generate audio using OpenAI TTS"""
     try:
-        response = requests.post(FPT_TTS_URL, headers=headers, data=text.encode('utf-8'))
-        response.raise_for_status()
-        data = response.json()
-        if data.get("error") == 0 and "async" in data:
-            url = data["async"]
-            for _ in range(5):
-                check = requests.head(url)
-                if check.status_code == 200:
-                    return url
-                time.sleep(1.5)
-            return None
-        else:
-            return None
+        response = openai_client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text
+        )
+        
+        temp_dir = os.path.join(os.getcwd(), "temp_audio")
+        os.makedirs(temp_dir, exist_ok=True)
+        audio_path = os.path.join(temp_dir, f"tts_{uuid.uuid4()}.mp3")
+        
+        response.stream_to_file(audio_path)
+        return audio_path
     except Exception as e:
-        print(f"❌ Error generating audio with FPT.AI: {e}")
+        print(f"❌ Error generating audio with OpenAI TTS: {e}")
         return None
 
-
-def send_message_to_llm(session_id, message):
-    headers = {"Authorization": f"Bearer {BEARER_TOKEN}", "Content-Type": "application/json"}
-    payload = {"sessionId": session_id, "chatInput": message}
+def chat_with_openai(message, conversation_history):
+    """Chat directly with OpenAI"""
     try:
-        response = requests.post(WEBHOOK_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        response_data = response.json()
+        messages = conversation_history + [{"role": "user", "content": message}]
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        assistant_message = response.choices[0].message.content
+        audio_path = generate_openai_audio(assistant_message)
+        
+        return {"contract": assistant_message, "audio_path": audio_path}
+    except Exception as e:
+        return {"contract": f"Lỗi: {str(e)}", "audio_path": None}
 
-        contract = response_data.get('output', "No contract received")
-        url = response_data.get('url', "No URL received")
-        north_audio = generate_fpt_audio(contract, "lannhi")
-        south_audio = generate_fpt_audio(contract, "banmai")
-        audio_urls = {}
-        if north_audio: audio_urls["north"] = north_audio
-        if south_audio: audio_urls["south"] = south_audio
-        return [{"json": {"contract": contract, "url": url, "audio": audio_urls}}]
-    except requests.exceptions.RequestException as e:
-        return [{"json": {"contract": f"Error: {str(e)}", "url": "", "audio": {}}}]
-
-
-def transcribe_audio(audio_bytes, mode="assembly"):
+def transcribe_audio(audio_bytes):
     temp_dir = os.path.join(os.getcwd(), "temp_audio")
     os.makedirs(temp_dir, exist_ok=True)
-
-    if mode == "assembly":
-        aai.settings.api_key = ASSEMBLYAI_API_KEY
-        transcriber = aai.Transcriber()
-        temp_webm_path = os.path.join(temp_dir, f"audio_{uuid.uuid4()}.webm")
-        try:
-            with open(temp_webm_path, 'wb') as f:
-                f.write(audio_bytes)
-            config = aai.TranscriptionConfig(language_code="vi")
-            transcript = transcriber.transcribe(temp_webm_path, config=config)
-            if transcript.status == aai.TranscriptStatus.error:
-                return f"Lỗi khi chuyển đổi giọng nói: {transcript.error}"
-            return transcript.text or "Không thể nhận diện giọng nói. Vui lòng thử lại."
-        finally:
-            if os.path.exists(temp_webm_path):
-                os.remove(temp_webm_path)
-
-    elif mode == "whisper":
-        temp_mp3_path = os.path.join(temp_dir, f"audio_{uuid.uuid4()}.mp3")
-        try:
-            print("🎤 Đang dùng OpenAI Whisper để nhận diện giọng nói...")
-            st.info("🎤 Đang dùng **OpenAI Whisper** để nhận diện giọng nói...")
-            with open(temp_mp3_path, "wb") as f:
-                f.write(audio_bytes)
-            with open(temp_mp3_path, "rb") as f:
-                transcript = openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    response_format="text",
-                    language="vi"
-                )
-            return transcript.strip()
-        finally:
-            if os.path.exists(temp_mp3_path):
-                os.remove(temp_mp3_path)
-
+    temp_mp3_path = os.path.join(temp_dir, f"audio_{uuid.uuid4()}.mp3")
+    
+    try:
+        with open(temp_mp3_path, "wb") as f:
+            f.write(audio_bytes)
+        with open(temp_mp3_path, "rb") as f:
+            transcript = openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                response_format="text",
+                language="vi"
+            )
+        return transcript.strip()
+    finally:
+        if os.path.exists(temp_mp3_path):
+            os.remove(temp_mp3_path)
 
 def display_output(output):
-    contract = output.get('json', {}).get('contract')
-    audio_urls = output.get('json', {}).get('audio', {})
+    contract = output.get('contract')
+    audio_path = output.get('audio_path')
 
     if contract and contract.strip():
         st.markdown(f"""<div class="assistant">🤖 {contract}</div>""", unsafe_allow_html=True)
 
-    if audio_urls and isinstance(audio_urls, dict):
-        st.markdown('<div class="assistant"><div class="audio-container">', unsafe_allow_html=True)
-        if audio_urls.get('north'):
-            st.markdown('<div class="audio-item"><div class="audio-label">🎵 Giọng miền Nam (Lan Nhi)</div>', unsafe_allow_html=True)
-            st.audio(audio_urls['north'], format="audio/mp3")
-            st.markdown('</div>', unsafe_allow_html=True)
-        if audio_urls.get('south'):
-            st.markdown('<div class="audio-item"><div class="audio-label">🎵 Giọng miền Bắc (Ban Mai)</div>', unsafe_allow_html=True)
-            st.audio(audio_urls['south'], format="audio/mp3")
-            st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
+    if audio_path and os.path.exists(audio_path):
+        st.audio(audio_path, format="audio/mp3")
 
-
-def process_audio_input(audio_data, mode="assembly"):
+def process_audio_input(audio_data):
     try:
         audio_bytes = base64.b64decode(audio_data["audioData"])
         st.audio(audio_bytes, format="audio/webm")
-        with st.spinner("Đang chuyển giọng nói thành văn bản..."):
-            transcript = transcribe_audio(audio_bytes, mode=mode)
-        with st.spinner("Đang chờ phản hồi từ AI..."):
-            llm_response = send_message_to_llm(st.session_state.session_id, transcript)
-        return transcript, llm_response[0]
+        
+        with st.spinner("🎤 Đang nhận diện giọng nói..."):
+            transcript = transcribe_audio(audio_bytes)
+        
+        # Get conversation history for context
+        conversation_history = []
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
+                conversation_history.append({"role": "user", "content": msg["content"]})
+            elif msg["role"] == "assistant":
+                conversation_history.append({"role": "assistant", "content": msg["content"].get("contract", "")})
+        
+        with st.spinner("🤖 Đang suy nghĩ..."):
+            response = chat_with_openai(transcript, conversation_history)
+        
+        return transcript, response
     except Exception as e:
         st.error(f"Lỗi xử lý audio: {e}")
         return None, None
-
 
 def reset_conversation():
     st.session_state.messages = []
@@ -378,11 +347,9 @@ def reset_conversation():
     for d in ["temp_audio", "temp_component"]:
         path = os.path.join(os.getcwd(), d)
         if os.path.exists(path): shutil.rmtree(path)
-    st.session_state.session_id = generate_session_id()
     st.session_state.component_key = str(uuid.uuid4())
     st.cache_data.clear()
     st.cache_resource.clear()
-
 
 # ========= MAIN =========
 def main():
@@ -391,58 +358,102 @@ def main():
     # UI Style
     st.markdown("""
         <style>
+        
+            
+            /* Messages */
             .assistant {
-                padding: 10px;
-                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                padding: 16px 22px;
+                border-radius: 20px;
                 max-width: 75%;
                 text-align: left;
+                margin: 12px 0;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+                color: #1a202c;
+                font-size: 15px;
+                line-height: 1.6;
+                border-left: 5px solid #667eea;
             }
+            
             .user {
-                padding: 10px;
-                border-radius: 10px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 16px 22px;
+                border-radius: 20px;
                 max-width: 75%;
                 text-align: right;
-                margin-left: auto;
+                margin: 12px 0 12px auto;
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                font-size: 15px;
+                line-height: 1.6;
             }
+            
+            /* Voice mode section */
             .voice-mode {
                 margin-top: 20px;
                 margin-bottom: 10px;
-            }
-            .stRadio > div {
-                display: flex !important;
-                flex-direction: row !important;
-                gap: 14px;
-                align-items: center;
-            }
-            .stRadio > div > label {
-                padding: 6px 12px;
-                border-radius: 16px;
-                border: 1px solid #e5e7eb;
-                background: #f8fafc;
-                cursor: pointer;
-            }
-            .stRadio > div > label[data-checked="true"] {
-                background: #3b82f6;
-                color: white;
-                border-color: #3b82f6;
-            }
-            .audio-container {
                 display: flex;
-                gap: 15px;
-                margin: 10px 0;
-                flex-wrap: wrap;
+                justify-content: flex-end;
             }
-            .audio-item {
-                flex: 1;
-                min-width: 200px;
+            
+            /* Reset button */
+            .stButton > button {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 10px;
+                padding: 10px 20px;
+                font-weight: 600;
+                box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+                transition: all 0.3s ease;
             }
-            .audio-label {
-                font-size: 14px;
-                font-weight: 500;
-                margin-bottom: 5px;
+            
+            .stButton > button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(245, 87, 108, 0.5);
             }
+            
+            /* Title */
+            h1 {
+                color: white !important;
+                text-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+                font-weight: 700;
+            }
+            
+            /* Audio player */
+            audio {
+                width: 100%;
+                margin-top: 10px;
+                border-radius: 10px;
+            }
+            
+            /* Spinner */
+            .stSpinner > div {
+                border-top-color: white !important;
+            }
+            
+            /* Success message */
+            .stSuccess {
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                border-radius: 10px;
+                border-left: 4px solid #48bb78;
+            }
+            
+            /* Error message */
+            .stError {
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                border-radius: 10px;
+                border-left: 4px solid #f56565;
+            }
+            
             @media (max-width: 520px) {
-                .voice-mode h3 { font-size: 16px; }
+                .assistant, .user {
+                    max-width: 85%;
+                    font-size: 14px;
+                }
             }
         </style>
     """, unsafe_allow_html=True)
@@ -462,42 +473,14 @@ def main():
 
     # Session init
     if "messages" not in st.session_state: st.session_state.messages = []
-    if "session_id" not in st.session_state: st.session_state.session_id = generate_session_id()
     if "component_key" not in st.session_state: st.session_state.component_key = str(uuid.uuid4())
     if "last_audio_timestamp" not in st.session_state: st.session_state.last_audio_timestamp = None
     if "processing_audio" not in st.session_state: st.session_state.processing_audio = False
 
-    # Voice mode
-    st.markdown('<div class="voice-mode">', unsafe_allow_html=True)
-    st.markdown("### 🎤 Voice mode")
-    voice_option = st.radio("Chọn chế độ nhận diện giọng nói", ("Nói -> Text (miễn phí)", "Nói -> Text (Whisper/OpenAI)"), index=0)
-
-    audio_data = audio_recorder(
-        interval=50, threshold=-60, play=False, silenceTimeout=1500,
-        key=f"audio_recorder_{st.session_state.component_key}"
-    )
-
-    if (audio_data and isinstance(audio_data, dict) and "audioData" in audio_data and not st.session_state.processing_audio):
-        current_timestamp = audio_data.get("timestamp")
-        if current_timestamp != st.session_state.last_audio_timestamp:
-            st.session_state.processing_audio = True
-            st.session_state.last_audio_timestamp = current_timestamp
-            mode = "assembly" if voice_option == "Nói -> Text (miễn phí)" else "whisper"
-            transcript, llm_response = process_audio_input(audio_data, mode=mode)
-            if transcript and llm_response:
-                st.session_state.messages.append({"role": "user", "content": transcript})
-                st.session_state.messages.append({"role": "assistant", "content": llm_response})
-                st.session_state.processing_audio = False
-                st.rerun()
-            else:
-                st.session_state.processing_audio = False
-    elif audio_data and "error" in audio_data:
-        st.error(f"Lỗi ghi âm: {audio_data['error']}")
-
     # Reset button
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("🗑️ Xóa hết", help="Xóa lịch sử chat", type="primary"):
+        if st.button("🗑️ Xóa hết", help="Xóa lịch sử chat"):
             reset_conversation()
             st.success("✅ Đã xóa hết!")
             st.rerun()
@@ -509,14 +492,51 @@ def main():
         elif message["role"] == "assistant":
             display_output(message["content"])
 
+    # Voice recorder ở dưới cùng, căn phải
+    st.markdown('<div class="voice-mode">', unsafe_allow_html=True)
+    
+    _, col_right = st.columns([3, 1])
+    with col_right:
+        audio_data = audio_recorder(
+            interval=50, threshold=-60, play=False, silenceTimeout=1500,
+            key=f"audio_recorder_{st.session_state.component_key}"
+        )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Process audio
+    if (audio_data and isinstance(audio_data, dict) and "audioData" in audio_data and not st.session_state.processing_audio):
+        current_timestamp = audio_data.get("timestamp")
+        if current_timestamp != st.session_state.last_audio_timestamp:
+            st.session_state.processing_audio = True
+            st.session_state.last_audio_timestamp = current_timestamp
+            transcript, response = process_audio_input(audio_data)
+            if transcript and response:
+                st.session_state.messages.append({"role": "user", "content": transcript})
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.session_state.processing_audio = False
+                st.rerun()
+            else:
+                st.session_state.processing_audio = False
+    elif audio_data and "error" in audio_data:
+        st.error(f"Lỗi ghi âm: {audio_data['error']}")
+
     # Chat input
     if prompt := st.chat_input("Nhập nội dung cần trao đổi ở đây nhé?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.spinner("Đang chờ phản hồi từ AI..."):
-            llm_response = send_message_to_llm(st.session_state.session_id, prompt)
-        st.session_state.messages.append({"role": "assistant", "content": llm_response[0]})
+        
+        conversation_history = []
+        for msg in st.session_state.messages[:-1]:
+            if msg["role"] == "user":
+                conversation_history.append({"role": "user", "content": msg["content"]})
+            elif msg["role"] == "assistant":
+                conversation_history.append({"role": "assistant", "content": msg["content"].get("contract", "")})
+        
+        with st.spinner("🤖 Đang suy nghĩ..."):
+            response = chat_with_openai(prompt, conversation_history)
+        
+        st.session_state.messages.append({"role": "assistant", "content": response})
         st.rerun()
-
 
 if __name__ == "__main__":
     main()
