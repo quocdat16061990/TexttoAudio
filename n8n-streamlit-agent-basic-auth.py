@@ -404,8 +404,6 @@ def main():
             }
             
             .user {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
                 padding: 14px 18px;
                 border-radius: 18px;
                 max-width: 80%;
