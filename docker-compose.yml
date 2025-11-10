@@ -1,18 +1,6 @@
 version: '3'
 
 services:
-  streamlit:
-    image: streamlit-app
-    container_name: streamlit-app
-    restart: always
-    expose:
-      - "8501"
-    environment:
-      - VIRTUAL_HOST=tenmiencuaban.com
-      - VIRTUAL_PORT=8501
-      - LETSENCRYPT_HOST=tenmiencuaban.com
-      - LETSENCRYPT_EMAIL=youremail@example.com
-
   nginx-proxy:
     image: jwilder/nginx-proxy
     container_name: nginx-proxy
@@ -37,3 +25,14 @@ services:
       - ./certs:/etc/nginx/certs
       - ./vhost.d:/etc/nginx/vhost.d
       - ./html:/usr/share/nginx/html
+
+  texttoaudio-app:
+    image: texttoaudio-app
+    container_name: texttoaudio-app
+    restart: always
+    environment:
+      - VIRTUAL_HOST=texttoaudio.shopabcquocdat.xyz
+      - LETSENCRYPT_HOST=texttoaudio.shopabcquocdat.xyz
+      - LETSENCRYPT_EMAIL=quocdattranhuu1606@gmail.com
+    expose:
+      - "8501"
