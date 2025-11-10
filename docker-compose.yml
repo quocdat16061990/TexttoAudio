@@ -34,5 +34,6 @@ services:
       - VIRTUAL_HOST=texttoaudio.shopabcquocdat.xyz
       - LETSENCRYPT_HOST=texttoaudio.shopabcquocdat.xyz
       - LETSENCRYPT_EMAIL=quocdattranhuu1606@gmail.com
+      - VIRTUAL_PORT=8501
     expose:
       - "8501"
