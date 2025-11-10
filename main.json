@@ -1,0 +1,58 @@
+{
+  "name": "Split PDF to 10 pages (PDF.co)",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [300, 300],
+      "parameters": {
+        "url": "https://example.com/sample.pdf",
+        "responseFormat": "file",
+        "options": {}
+      }
+    },
+    {
+      "id": "2",
+      "name": "Split PDF (PDF.co)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [600, 300],
+      "parameters": {
+        "url": "https://api.pdf.co/v1/pdf/split",
+        "method": "POST",
+        "sendBinaryData": true,
+        "binaryPropertyName": "data",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\"pages\":\"1-10\",\"name\":\"split_10_pages.pdf\"}",
+        "headerParametersJson": "{\"x-api-key\":\"YOUR_API_KEY\"}"
+      },
+      "credentials": {}
+    },
+    {
+      "id": "3",
+      "name": "Download Split File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "url": "={{$json[\"url\"]}}",
+        "responseFormat": "file"
+      }
+    }
+  ],
+  "connections": {
+    "Download PDF": {
+      "main": [
+        [{ "node": "Split PDF (PDF.co)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split PDF (PDF.co)": {
+      "main": [
+        [{ "node": "Download Split File", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
