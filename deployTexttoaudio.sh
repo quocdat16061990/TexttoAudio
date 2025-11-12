@@ -12,7 +12,8 @@ log "==============================================="
 log "🚀 Bắt đầu deployment..."
 log "📥 Pulling latest code from GitHub..."
 cd ~/TexttoAudio
-git pull origin main 2>&1 | tee -a $LOG_FILE
+git fetch --all -p        2>&1 | tee -a "$LOG_FILE"
+git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"
 log "🔧 Running deployment steps..."
 # Thêm các bước deploy của bạn ở đây
 log "✅ Deployment hoàn tất!"

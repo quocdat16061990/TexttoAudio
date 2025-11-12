@@ -22,7 +22,13 @@ jobs:
           timeout: 30s
           command_timeout: 10m
           script: |
+            set -euo pipefail
+            echo "🚀 Deploying TextoAudio app to VPS..."
             cd ~/TexttoAudio
-            git pull origin main
-            ./deployTexttoaudio.sh
+            # đảm bảo luôn chạy được
+            chmod +x ./deployTexttoaudio.sh || true
+            dos2unix ./deployTexttoaudio.sh 2>/dev/null || true
+            bash -lc "./deployORCWEB.sh"
+
+            echo "✅ Deployment completed successfully!"
 
