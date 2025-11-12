@@ -28,7 +28,7 @@ jobs:
             # đảm bảo luôn chạy được
             chmod +x ./deployTexttoaudio.sh || true
             dos2unix ./deployTexttoaudio.sh 2>/dev/null || true
-            bash -lc "./deployORCWEB.sh"
+            bash -lc "./deployTexttoaudio.sh"
 
             echo "✅ Deployment completed successfully!"
 
