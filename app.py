@@ -6,6 +6,17 @@ import base64
 import streamlit.components.v1 as components
 import shutil
 from openai import OpenAI
+
+
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # ========= CONFIG =========
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
